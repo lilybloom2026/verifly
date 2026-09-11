@@ -31,8 +31,8 @@ export default function HeroOverlay() {
     <div className="pointer-events-none absolute inset-0 z-10 flex flex-col justify-between">
       {/* dark scrim behind the top text so it reads cleanly over the brain */}
       <div
-        className="pointer-events-none absolute inset-x-0 top-0 h-[52%]"
-        style={{ background: "linear-gradient(to bottom, rgba(5,5,5,0.92) 0%, rgba(5,5,5,0.6) 45%, rgba(5,5,5,0) 100%)" }}
+        className="pointer-events-none absolute inset-x-0 top-0 h-[60%]"
+        style={{ background: "linear-gradient(to bottom, rgba(5,5,5,0.99) 0%, rgba(5,5,5,0.97) 42%, rgba(5,5,5,0.72) 62%, rgba(5,5,5,0) 100%)" }}
         aria-hidden
       />
 

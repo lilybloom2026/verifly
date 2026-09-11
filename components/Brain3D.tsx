@@ -240,7 +240,7 @@ export default function Brain3D({ brain }: { brain: FlyBrain }) {
   });
 
   return (
-    <group ref={groupRef}>
+    <group ref={groupRef} position={[0, -2.6, 0]}>
       <primitive object={dust} />
       <primitive object={edges.obj} />
       <primitive object={neuron} />

@@ -277,6 +277,11 @@ export default function Prover() {
     a.click();
   };
 
+  const rollRandom = () => {
+    if (busy) return;
+    setSeed(Math.floor(Math.random() * 100000) >>> 0);
+  };
+
   const doBreed = () => {
     const child = breed(defaultGenome(pa), defaultGenome(pb), Date.now() % 997);
     setSeed(child.seed);
@@ -299,35 +304,64 @@ export default function Prover() {
       </p>
 
       {/* run bar, kept high so it's visible the moment you land here */}
-      <div className="mt-6 rounded-lg border border-line bg-panel/70 p-4">
-        <div className="mb-3 flex flex-wrap items-center gap-2">
-          <span className="label mr-1">seed</span>
-          <input
-            type="number"
-            value={seed}
-            onChange={(e) => setSeed(parseInt(e.target.value || "0", 10) >>> 0)}
-            className="w-28 rounded border border-line2 bg-[#0f0f0f] px-2 py-1.5 font-mono text-[13px] text-ink focus:border-spike focus:outline-none"
-          />
-          {WINNERS.map((w) => (
-            <button
-              key={w}
-              onClick={() => setSeed(w)}
-              className={
-                "rounded-full border px-2.5 py-1 font-mono text-[11px] transition " +
-                (seed === w
-                  ? "border-spike bg-spike/15 text-spike"
-                  : "border-line2 bg-[#0f0f0f] text-inkdim hover:border-spike hover:text-ink")
-              }
-            >
-              #{w}
-            </button>
-          ))}
+      <div className="mt-6 rounded-xl border border-line2 bg-panel/80 p-5">
+        <h3 className="font-display text-[18px] font-bold tracking-tight text-ink">
+          Step 1 · pick a fly, then run it
+        </h3>
+        <p className="mt-1 text-[13px] leading-relaxed text-inkdim">
+          Every number is a different fly brain, wired from that seed. Type any number, roll a random
+          one, or tap a proven fly below that already reaches the food. Then hit run.
+        </p>
+
+        <div className="mt-4 flex flex-col gap-2 sm:flex-row sm:items-end">
+          <label className="flex flex-1 flex-col gap-1">
+            <span className="font-mono text-[10px] uppercase tracking-widest text-inkmut">
+              genome seed
+            </span>
+            <input
+              type="number"
+              value={seed}
+              onChange={(e) => setSeed(parseInt(e.target.value || "0", 10) >>> 0)}
+              placeholder="e.g. 130"
+              className="w-full rounded-lg border border-line2 bg-[#0f0f0f] px-3 py-3 font-mono text-[16px] text-ink placeholder:text-inkmut focus:border-spike focus:outline-none"
+            />
+          </label>
+          <button
+            onClick={rollRandom}
+            disabled={busy}
+            className="rounded-lg border border-line2 bg-[#0f0f0f] px-4 py-3 font-mono text-[13px] text-inkdim transition hover:border-spike hover:text-spike disabled:cursor-not-allowed disabled:text-inkmut"
+          >
+            🎲 random fly
+          </button>
         </div>
+
+        <div className="mt-3">
+          <div className="mb-1.5 font-mono text-[10px] uppercase tracking-widest text-inkmut">
+            proven to reach the food · tap one
+          </div>
+          <div className="flex flex-wrap gap-1.5">
+            {WINNERS.map((w) => (
+              <button
+                key={w}
+                onClick={() => setSeed(w)}
+                className={
+                  "rounded-full border px-3 py-1.5 font-mono text-[12px] transition " +
+                  (seed === w
+                    ? "border-spike bg-spike/15 text-spike"
+                    : "border-line2 bg-[#0f0f0f] text-inkdim hover:border-spike hover:text-ink")
+                }
+              >
+                #{w}
+              </button>
+            ))}
+          </div>
+        </div>
+
         <button
           onClick={() => startRun()}
           disabled={busy}
           className={
-            "w-full rounded-lg border px-5 py-4 text-center font-mono text-[15px] font-bold uppercase tracking-widest transition-transform duration-150 active:scale-[0.99] " +
+            "mt-4 w-full rounded-lg border px-5 py-4 text-center font-mono text-[15px] font-bold uppercase tracking-widest transition-transform duration-150 active:scale-[0.99] " +
             (busy
               ? "cursor-not-allowed border-line2 bg-[#0f0f0f] text-inkmut"
               : "border-spike bg-spike text-black hover:bg-[#e5e5e5]")
@@ -337,7 +371,7 @@ export default function Prover() {
             ? "the fly is running… watch it navigate"
             : phase === "proving"
             ? `sealing proof… ${progress}%`
-            : "▸ Run & prove this genome"}
+            : `▸ Run & prove fly #${seed}`}
         </button>
       </div>
 

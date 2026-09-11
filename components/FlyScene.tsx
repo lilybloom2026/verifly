@@ -42,6 +42,7 @@ export default function FlyScene() {
           dampingFactor={0.06}
           autoRotate
           autoRotateSpeed={0.35}
+          target={[0, -2.6, 0]}
           minPolarAngle={Math.PI * 0.18}
           maxPolarAngle={Math.PI * 0.82}
         />
