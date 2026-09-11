@@ -1,0 +1,29 @@
+# Postgres for VERIFLY. The app works WITHOUT this (in-memory fallback), but for
+# a durable, production-grade run registry:
+#
+#   docker compose up -d
+#   export DATABASE_URL=postgres://verifly:verifly@localhost:5432/verifly
+#   npm run dev
+#
+# The `runs` table is created automatically on first query.
+
+services:
+  db:
+    image: postgres:16-alpine
+    container_name: verifly-pg
+    environment:
+      POSTGRES_USER: verifly
+      POSTGRES_PASSWORD: verifly
+      POSTGRES_DB: verifly
+    ports:
+      - "5432:5432"
+    volumes:
+      - verifly_pg:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U verifly"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+volumes:
+  verifly_pg:

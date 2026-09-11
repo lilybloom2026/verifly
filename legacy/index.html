@@ -1,0 +1,948 @@
+<title>Feed the Fly</title>
+<meta name="description" content="A live leaky integrate-and-fire simulation of a fruit fly's connectome. Feed it anything and watch its brain react." />
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Syne:wght@600;700;800&family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans:wght@400;500;600&display=swap" />
+<style>
+  :root{
+    --bg:#060a0b;
+    --bg-2:#040708;
+    --panel:#0c1214;
+    --panel-2:#101a1c;
+    --line:#1b2a2c;
+    --line-2:#26393b;
+    --ink:#d6e4e0;
+    --ink-dim:#96a8a3;
+    --ink-mut:#6e807c;
+    --exc:#ff9d4d;   /* ACh — excitatory */
+    --inh:#59b0ff;   /* GABA / glutamate — inhibitory */
+    --spike:#57ffbf; /* membrane / firing phosphor */
+    --click:#ff5470; /* CLICK descending neuron */
+    --good:#57ffbf;
+    --maxw:1180px;
+    --r:4px;
+  }
+  *{box-sizing:border-box}
+  html{-webkit-text-size-adjust:100%}
+  body{
+    margin:0;
+    background:
+      radial-gradient(120% 80% at 50% -10%, #0a1214 0%, var(--bg) 55%, var(--bg-2) 100%) fixed;
+    color:var(--ink);
+    font-family:"IBM Plex Sans",system-ui,sans-serif;
+    font-size:15px;
+    line-height:1.6;
+    -webkit-font-smoothing:antialiased;
+    overflow-x:hidden;
+  }
+  .wrap{max-width:var(--maxw);margin:0 auto;padding:0 20px}
+  a{color:var(--spike);text-decoration:none;border-bottom:1px solid color-mix(in oklab, var(--spike) 35%, transparent)}
+  a:hover{color:#fff;border-color:currentColor}
+  ::selection{background:color-mix(in oklab,var(--spike) 40%, transparent);color:#fff}
+  :focus-visible{outline:2px solid var(--spike);outline-offset:2px;border-radius:2px}
+
+  .mono{font-family:"IBM Plex Mono",ui-monospace,monospace}
+  .label{
+    font-family:"IBM Plex Mono",monospace;
+    font-size:10.5px;font-weight:500;
+    letter-spacing:.16em;text-transform:uppercase;color:var(--ink-mut);
+  }
+  .num{font-family:"IBM Plex Mono",monospace;font-variant-numeric:tabular-nums}
+
+  /* ---------- masthead ---------- */
+  header.top{
+    border-bottom:1px solid var(--line);
+    background:linear-gradient(180deg, color-mix(in oklab,var(--panel) 70%, transparent), transparent);
+    position:relative;z-index:5;
+  }
+  .mast{display:flex;align-items:center;gap:16px;padding:14px 0;flex-wrap:wrap}
+  .brand{display:flex;align-items:baseline;gap:10px}
+  .wordmark{
+    font-family:"Syne",sans-serif;font-weight:800;font-size:26px;letter-spacing:-.02em;
+    color:var(--ink);line-height:1;
+  }
+  .wordmark b{color:var(--spike)}
+  .ticker{
+    font-family:"IBM Plex Mono",monospace;font-size:11px;color:var(--exc);
+    border:1px solid color-mix(in oklab,var(--exc) 40%, transparent);
+    padding:2px 6px;border-radius:3px;letter-spacing:.04em;
+  }
+  .mast .spacer{flex:1}
+  .status{display:flex;align-items:center;gap:8px}
+  .led{
+    width:8px;height:8px;border-radius:50%;background:var(--spike);
+    box-shadow:0 0 0 0 color-mix(in oklab,var(--spike) 70%, transparent);
+    animation:pulse 2.4s ease-out infinite;
+  }
+  @keyframes pulse{0%{box-shadow:0 0 0 0 color-mix(in oklab,var(--spike) 60%, transparent)}70%{box-shadow:0 0 0 7px transparent}100%{box-shadow:0 0 0 0 transparent}}
+  .mast nav{display:flex;gap:18px}
+  .mast nav a{color:var(--ink-mut);border:0;font-size:13px}
+  .mast nav a:hover{color:var(--ink)}
+
+  /* ---------- hero line ---------- */
+  .hero{padding:30px 0 8px}
+  .hero h1{
+    font-family:"Syne",sans-serif;font-weight:800;
+    font-size:clamp(30px,5.4vw,58px);line-height:1.02;letter-spacing:-.025em;
+    margin:0 0 14px;text-wrap:balance;max-width:16ch;
+  }
+  .hero h1 .g{color:var(--spike)}
+  .hero p.lede{
+    font-size:clamp(15px,2vw,18px);color:#aab8b4;max-width:60ch;margin:0;
+  }
+  .hero p.lede b{color:var(--ink);font-weight:500}
+
+  /* ---------- the rig ---------- */
+  section.rig{padding:22px 0 8px}
+  .console{
+    display:grid;
+    grid-template-columns: minmax(0,1.35fr) minmax(0,1fr);
+    gap:14px;
+    align-items:start;
+  }
+  .panel{
+    background:linear-gradient(180deg,var(--panel),var(--panel-2));
+    border:1px solid var(--line);
+    border-radius:var(--r);
+    position:relative;
+  }
+  .panel > .phead{
+    display:flex;align-items:center;justify-content:space-between;gap:10px;
+    padding:9px 12px;border-bottom:1px solid var(--line);
+  }
+  .phead .dot{width:6px;height:6px;border-radius:50%;background:var(--line-2);display:inline-block;margin-right:7px;vertical-align:middle}
+  /* corner ticks */
+  .panel::before,.panel::after{
+    content:"";position:absolute;width:8px;height:8px;pointer-events:none;opacity:.5;
+  }
+  .panel::before{top:-1px;left:-1px;border-top:1px solid var(--spike);border-left:1px solid var(--spike)}
+  .panel::after{bottom:-1px;right:-1px;border-bottom:1px solid var(--spike);border-right:1px solid var(--spike)}
+
+  /* optic view */
+  .optic-body{padding:14px;position:relative}
+  .optic-canvas-holder{position:relative;width:100%;max-width:560px;margin:0 auto}
+  #optic{width:100%;height:auto;display:block;image-rendering:optimizeQuality;border-radius:2px}
+  .scanlines{
+    position:absolute;inset:0;pointer-events:none;border-radius:2px;
+    background:repeating-linear-gradient(180deg, transparent 0 2px, rgba(0,0,0,.16) 2px 3px);
+    mix-blend-mode:multiply;opacity:.6;
+  }
+  .optic-legend{
+    display:flex;gap:16px;flex-wrap:wrap;justify-content:center;margin-top:12px;
+  }
+  .lg{display:flex;align-items:center;gap:6px}
+  .swatch{width:10px;height:10px;border-radius:2px;display:inline-block}
+  .lg span:last-child{font-size:11px;color:var(--ink-mut)}
+  .seeing{
+    text-align:center;margin-top:6px;font-size:12.5px;color:var(--ink-dim);
+  }
+  .seeing b{color:var(--spike);font-family:"IBM Plex Mono",monospace}
+
+  /* right stack */
+  .stack{display:flex;flex-direction:column;gap:14px}
+
+  /* raster */
+  .raster-body{padding:10px 12px 12px}
+  #raster{width:100%;height:auto;display:block;background:#050809;border:1px solid var(--line);border-radius:2px}
+  .raster-axes{display:flex;justify-content:space-between;margin-top:5px}
+
+  /* descending neurons */
+  .dn-body{padding:12px}
+  .dn-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:10px}
+  .dn{display:flex;flex-direction:column;align-items:center;gap:7px}
+  .dn .bar{
+    width:100%;height:74px;background:#070c0d;border:1px solid var(--line);
+    border-radius:2px;position:relative;overflow:hidden;
+  }
+  .dn .fill{
+    position:absolute;left:0;right:0;bottom:0;height:0%;
+    background:linear-gradient(180deg,color-mix(in oklab,var(--spike) 85%, transparent),color-mix(in oklab,var(--spike) 25%, transparent));
+    transition:height .05s linear;
+  }
+  .dn .thresh{position:absolute;left:0;right:0;top:22%;height:1px;background:color-mix(in oklab,var(--exc) 70%, transparent);opacity:.6}
+  .dn.fired .bar{box-shadow:inset 0 0 0 1px var(--spike), 0 0 14px color-mix(in oklab,var(--spike) 55%, transparent)}
+  .dn.click .fill{background:linear-gradient(180deg,var(--click),color-mix(in oklab,var(--click) 25%, transparent))}
+  .dn.click.fired .bar{box-shadow:inset 0 0 0 1px var(--click), 0 0 14px color-mix(in oklab,var(--click) 55%, transparent)}
+  .dn .nm{font-family:"IBM Plex Mono",monospace;font-size:10px;letter-spacing:.1em;color:var(--ink-mut)}
+  .dn .ct{font-family:"IBM Plex Mono",monospace;font-size:12px;color:var(--ink)}
+
+  /* readouts */
+  .read-body{padding:4px 0}
+  .read-row{
+    display:flex;align-items:center;justify-content:space-between;
+    padding:9px 12px;border-bottom:1px solid var(--line);
+  }
+  .read-row:last-child{border-bottom:0}
+  .read-row .k{font-size:11px;letter-spacing:.14em;text-transform:uppercase;color:var(--ink-mut);font-family:"IBM Plex Mono",monospace}
+  .read-row .v{font-family:"IBM Plex Mono",monospace;font-size:16px;color:var(--ink);font-variant-numeric:tabular-nums}
+  .read-row .v small{font-size:11px;color:var(--ink-mut)}
+  /* E/I balance */
+  .ei{padding:12px}
+  .ei-bar{height:14px;border-radius:2px;overflow:hidden;display:flex;border:1px solid var(--line);background:#070c0d}
+  .ei-bar .e{background:linear-gradient(90deg,color-mix(in oklab,var(--exc) 30%, transparent),var(--exc));transition:width .12s ease}
+  .ei-bar .i{background:linear-gradient(90deg,var(--inh),color-mix(in oklab,var(--inh) 30%, transparent));transition:width .12s ease;margin-left:auto}
+  .ei-cap{display:flex;justify-content:space-between;margin-top:7px}
+
+  /* world / gaze inset */
+  .world-body{padding:12px;display:flex;gap:12px;align-items:flex-start}
+  #world{width:120px;height:120px;flex:0 0 120px;background:#050809;border:1px solid var(--line);border-radius:2px;display:block}
+  .world-txt{font-size:12.5px;color:var(--ink-dim);line-height:1.55}
+  .world-txt b{color:var(--ink)}
+
+  /* ---------- feed dock ---------- */
+  .dock{margin-top:14px;padding:16px;border:1px solid var(--line);border-radius:var(--r);
+    background:linear-gradient(180deg,var(--panel),var(--panel-2));position:relative}
+  .dock::before,.dock::after{content:"";position:absolute;width:8px;height:8px;pointer-events:none;opacity:.5}
+  .dock::before{top:-1px;left:-1px;border-top:1px solid var(--exc);border-left:1px solid var(--exc)}
+  .dock::after{bottom:-1px;right:-1px;border-bottom:1px solid var(--exc);border-right:1px solid var(--exc)}
+  .dock h3{margin:0 0 3px;font-family:"Syne",sans-serif;font-weight:700;font-size:18px;letter-spacing:-.01em}
+  .dock .sub{margin:0 0 13px;font-size:13px;color:var(--ink-mut)}
+  .feed-row{display:flex;gap:8px;flex-wrap:wrap}
+  .feed-row input[type=text]{
+    flex:1;min-width:200px;background:#070c0d;border:1px solid var(--line-2);color:var(--ink);
+    font-family:"IBM Plex Mono",monospace;font-size:14px;padding:11px 13px;border-radius:3px;
+  }
+  .feed-row input::placeholder{color:var(--ink-mut)}
+  .feed-row input:focus{border-color:var(--spike);outline:none}
+  .btn{
+    font-family:"IBM Plex Mono",monospace;font-size:13px;letter-spacing:.04em;cursor:pointer;
+    background:var(--spike);color:#04110b;border:1px solid var(--spike);font-weight:600;
+    padding:11px 18px;border-radius:3px;
+  }
+  .btn:hover{background:#7dffce}
+  .btn.ghost{background:transparent;color:var(--ink);border-color:var(--line-2)}
+  .btn.ghost:hover{border-color:var(--spike);color:var(--spike)}
+  .chips{display:flex;gap:7px;flex-wrap:wrap;margin-top:12px;align-items:center}
+  .chips .clbl{margin-right:2px}
+  .chip{
+    font-family:"IBM Plex Mono",monospace;font-size:12px;cursor:pointer;
+    background:#070c0d;border:1px solid var(--line-2);color:var(--ink-dim);
+    padding:6px 11px;border-radius:100px;transition:all .12s;
+  }
+  .chip:hover{color:var(--ink);border-color:var(--spike)}
+  .chip[aria-pressed=true]{color:#04110b;background:var(--spike);border-color:var(--spike);font-weight:600}
+  .dock-tools{display:flex;gap:8px;flex-wrap:wrap;margin-top:14px;align-items:center}
+  .toast{font-family:"IBM Plex Mono",monospace;font-size:12px;color:var(--spike);opacity:0;transition:opacity .2s}
+  .toast.show{opacity:1}
+
+  /* ---------- explainer ---------- */
+  section.explain{padding:52px 0 10px}
+  .kicker{margin-bottom:10px}
+  h2.sec{font-family:"Syne",sans-serif;font-weight:800;font-size:clamp(24px,3.6vw,36px);letter-spacing:-.02em;margin:0 0 8px;text-wrap:balance}
+  .sec-lede{color:#aab8b4;max-width:64ch;margin:0 0 26px}
+  .cards{display:grid;grid-template-columns:repeat(4,1fr);gap:12px}
+  .card{border:1px solid var(--line);border-radius:var(--r);padding:16px;background:linear-gradient(180deg,var(--panel),transparent)}
+  .card .big{font-family:"IBM Plex Mono",monospace;font-size:26px;font-weight:600;color:var(--spike);line-height:1.1;letter-spacing:-.01em}
+  .card .big .u{font-size:13px;color:var(--ink-mut)}
+  .card h4{margin:11px 0 6px;font-size:14px;font-weight:600;color:var(--ink);font-family:"IBM Plex Sans",sans-serif}
+  .card p{margin:0;font-size:12.5px;color:var(--ink-mut);line-height:1.55}
+
+  /* pipeline */
+  .pipe{display:grid;grid-template-columns:repeat(4,1fr);gap:0;margin-top:14px;border:1px solid var(--line);border-radius:var(--r);overflow:hidden}
+  .step{padding:16px;border-right:1px solid var(--line);position:relative}
+  .step:last-child{border-right:0}
+  .step .n{font-family:"IBM Plex Mono",monospace;font-size:11px;color:var(--exc);letter-spacing:.14em}
+  .step h5{margin:8px 0 5px;font-size:14px;color:var(--ink);font-family:"IBM Plex Sans",sans-serif;font-weight:600}
+  .step p{margin:0;font-size:12px;color:var(--ink-mut);line-height:1.5}
+  .step .arrow{position:absolute;right:-7px;top:50%;transform:translateY(-50%);color:var(--spike);z-index:2;font-size:14px;background:var(--bg);padding:0 1px}
+
+  /* narrative */
+  section.story{padding:52px 0 10px}
+  .story-grid{display:grid;grid-template-columns:1.1fr .9fr;gap:34px;align-items:start}
+  .story p{color:#b3c1bd;margin:0 0 15px;max-width:60ch}
+  .story p b{color:var(--ink);font-weight:500}
+  .pull{
+    font-family:"Syne",sans-serif;font-weight:700;font-size:clamp(19px,2.4vw,25px);
+    line-height:1.28;letter-spacing:-.01em;color:var(--ink);
+    border-left:2px solid var(--spike);padding-left:18px;text-wrap:balance;
+  }
+  .pull .g{color:var(--spike)}
+
+  /* fine print / honesty */
+  .honest{margin-top:34px;border:1px solid color-mix(in oklab,var(--exc) 32%, var(--line));border-radius:var(--r);
+    background:linear-gradient(180deg,color-mix(in oklab,var(--exc) 6%, var(--panel)),var(--panel-2));padding:20px 22px}
+  .honest .label{color:var(--exc)}
+  .honest p{margin:9px 0 0;color:#c4cfca;font-size:13.5px;max-width:70ch}
+  .honest p b{color:var(--ink)}
+
+  /* footer */
+  footer{margin-top:56px;border-top:1px solid var(--line);padding:26px 0 40px}
+  .foot{display:flex;justify-content:space-between;gap:20px;flex-wrap:wrap;align-items:flex-start}
+  .foot .fbrand{font-family:"Syne",sans-serif;font-weight:800;font-size:18px}
+  .foot .fbrand b{color:var(--spike)}
+  .foot p{font-size:12px;color:var(--ink-mut);max-width:52ch;margin:8px 0 0}
+  .foot .links{display:flex;gap:20px;flex-wrap:wrap}
+  .foot .links a{color:var(--ink-mut);border:0;font-size:13px}
+  .foot .links a:hover{color:var(--spike)}
+  .disc{margin-top:20px;font-size:11px;color:#55645f;font-family:"IBM Plex Mono",monospace;line-height:1.6;max-width:80ch}
+
+  @media (max-width:900px){
+    .console{grid-template-columns:1fr}
+    .cards{grid-template-columns:repeat(2,1fr)}
+    .pipe{grid-template-columns:1fr;} .step{border-right:0;border-bottom:1px solid var(--line)} .step:last-child{border-bottom:0} .step .arrow{display:none}
+    .story-grid{grid-template-columns:1fr;gap:22px}
+  }
+  @media (max-width:520px){
+    .cards{grid-template-columns:1fr}
+    .dn-grid{gap:7px}
+    .world-body{flex-direction:column}
+  }
+  @media (prefers-reduced-motion:reduce){
+    .led{animation:none}
+    .dn .fill{transition:none}
+  }
+</style>
+
+<header class="top">
+  <div class="wrap mast">
+    <div class="brand">
+      <span class="wordmark">FLY<b>BRAIN</b></span>
+      <span class="ticker">$FLYBRAIN</span>
+    </div>
+    <div class="spacer"></div>
+    <div class="status">
+      <span class="led" aria-hidden="true"></span>
+      <span class="label" style="color:var(--spike)">connectome online</span>
+    </div>
+    <nav>
+      <a href="#rig">the rig</a>
+      <a href="#how">how it works</a>
+      <a href="#story">the fly</a>
+    </nav>
+  </div>
+</header>
+
+<main>
+  <div class="wrap hero">
+    <h1>Feed a fruit fly's brain. <span class="g">Watch it react.</span></h1>
+    <p class="lede">A live, neuron-by-neuron simulation of the <b>Drosophila connectome</b> — 166,000 neurons wired exactly as an electron microscope traced them. Type anything into its compound eye and its <b>real neural dynamics</b> decide where to look, where to crawl, and when to click.</p>
+  </div>
+
+  <!-- ============ THE RIG ============ -->
+  <section class="rig wrap" id="rig">
+    <div class="console">
+
+      <!-- LEFT: optic view -->
+      <div class="panel">
+        <div class="phead">
+          <span class="label"><span class="dot" style="background:var(--spike)"></span>optic view · 892 ommatidia</span>
+          <span class="label num" id="fps">— fps</span>
+        </div>
+        <div class="optic-body">
+          <div class="optic-canvas-holder">
+            <canvas id="optic" width="560" height="560" role="img" aria-label="Live hexagonal compound-eye view of the fruit fly brain simulation"></canvas>
+            <div class="scanlines" aria-hidden="true"></div>
+          </div>
+          <p class="seeing">retina is looking at <b id="seeing">FLYBRAIN</b></p>
+          <div class="optic-legend" aria-hidden="true">
+            <div class="lg"><span class="swatch" style="background:var(--spike)"></span><span>photoreceptor firing</span></div>
+            <div class="lg"><span class="swatch" style="background:var(--exc)"></span><span>high-contrast edge</span></div>
+            <div class="lg"><span class="swatch" style="background:#0e1a1c"></span><span>at rest</span></div>
+          </div>
+        </div>
+      </div>
+
+      <!-- RIGHT: instrument stack -->
+      <div class="stack">
+
+        <div class="panel">
+          <div class="phead">
+            <span class="label"><span class="dot" style="background:var(--exc)"></span>spike raster · 160 neurons</span>
+            <span class="label">time →</span>
+          </div>
+          <div class="raster-body">
+            <canvas id="raster" width="360" height="150" aria-label="Scrolling spike raster of neural activity"></canvas>
+            <div class="raster-axes">
+              <span class="label" style="color:var(--exc)">■ ACh (excite)</span>
+              <span class="label" style="color:var(--inh)">■ GABA / Glu (inhibit)</span>
+            </div>
+          </div>
+        </div>
+
+        <div class="panel">
+          <div class="phead"><span class="label"><span class="dot" style="background:var(--click)"></span>descending neurons → cursor</span></div>
+          <div class="dn-body">
+            <div class="dn-grid">
+              <div class="dn" id="dn-left"><div class="bar"><div class="thresh"></div><div class="fill"></div></div><div class="nm">LEFT</div><div class="ct num">0</div></div>
+              <div class="dn" id="dn-fwd"><div class="bar"><div class="thresh"></div><div class="fill"></div></div><div class="nm">FWD</div><div class="ct num">0</div></div>
+              <div class="dn" id="dn-right"><div class="bar"><div class="thresh"></div><div class="fill"></div></div><div class="nm">RIGHT</div><div class="ct num">0</div></div>
+              <div class="dn click" id="dn-click"><div class="bar"><div class="thresh"></div><div class="fill"></div></div><div class="nm">CLICK</div><div class="ct num">0</div></div>
+            </div>
+          </div>
+        </div>
+
+        <div class="panel">
+          <div class="phead"><span class="label"><span class="dot"></span>live readout</span></div>
+          <div class="read-body">
+            <div class="read-row"><span class="k">spikes / sec</span><span class="v" id="r-rate">0</span></div>
+            <div class="read-row"><span class="k">neurons active</span><span class="v" id="r-active">0 <small>/ 220</small></span></div>
+            <div class="read-row"><span class="k">gaze coord</span><span class="v" id="r-gaze">000,000</span></div>
+            <div class="read-row"><span class="k">clicks emitted</span><span class="v" id="r-clicks">0</span></div>
+          </div>
+        </div>
+
+        <div class="panel">
+          <div class="phead"><span class="label"><span class="dot"></span>excitation / inhibition</span></div>
+          <div class="ei">
+            <div class="ei-bar"><div class="e" id="ei-e" style="width:70%"></div><div class="i" id="ei-i" style="width:30%"></div></div>
+            <div class="ei-cap">
+              <span class="label" style="color:var(--exc)" id="ei-el">ACh 70%</span>
+              <span class="label" style="color:var(--inh)" id="ei-il">GABA/Glu 30%</span>
+            </div>
+          </div>
+        </div>
+
+        <div class="panel">
+          <div class="phead"><span class="label"><span class="dot"></span>gaze / world</span></div>
+          <div class="world-body">
+            <canvas id="world" width="120" height="120" aria-label="Map of where the fly is crawling across what you fed it"></canvas>
+            <div class="world-txt">The crosshair is where the fly's fovea is pointed. Its four descending neurons steer it across whatever you feed — chasing edges and motion, the way a real fly's optomotor reflex works. <b>Feed it something below.</b></div>
+          </div>
+        </div>
+
+      </div>
+    </div>
+
+    <!-- FEED DOCK -->
+    <div class="dock" id="feed">
+      <h3>Feed the fly</h3>
+      <p class="sub">Whatever you type is rendered into a field of light. The compound eye samples it; the brain does the rest.</p>
+      <form class="feed-row" id="feedForm" autocomplete="off">
+        <input type="text" id="feedInput" maxlength="42" placeholder="a word, a name, a ticker, anything…" aria-label="What to feed the fly" />
+        <button class="btn" type="submit">FEED ▸</button>
+      </form>
+      <div class="chips">
+        <span class="label clbl">or a scene:</span>
+        <button class="chip" type="button" data-scene="text" data-text="BANANA">banana</button>
+        <button class="chip" type="button" data-scene="face">a face :)</button>
+        <button class="chip" type="button" data-scene="dot">moving dot</button>
+        <button class="chip" type="button" data-scene="text" data-text="$FLYBRAIN">the ticker</button>
+        <button class="chip" type="button" data-scene="noise">static noise</button>
+        <button class="chip" type="button" data-scene="grating">drifting grating</button>
+      </div>
+      <div class="dock-tools">
+        <button class="btn ghost" type="button" id="pauseBtn">❚❚ pause</button>
+        <button class="btn ghost" type="button" id="snapBtn">⧉ copy shareable caption</button>
+        <span class="toast" id="toast">copied — now screenshot the eye ▸</span>
+      </div>
+    </div>
+  </section>
+
+  <!-- ============ HOW IT WORKS ============ -->
+  <section class="explain wrap" id="how">
+    <div class="label kicker" style="color:var(--exc)">what you're actually looking at</div>
+    <h2 class="sec">Not an animation. A brain running.</h2>
+    <p class="sec-lede">On September 3, 2026, Google Research and HHMI Janelia released the complete male <em>Drosophila</em> connectome — every neuron and every connection traced by electron microscopy. This page runs a leaky integrate-and-fire model on that wiring diagram.</p>
+
+    <div class="cards">
+      <div class="card">
+        <div class="big">166<span class="u">K</span></div>
+        <h4>Neurons, real wiring</h4>
+        <p>The full traced connectome. Each simulated cell leaks, integrates current, and fires past threshold — the standard model of a spiking neuron.</p>
+      </div>
+      <div class="card">
+        <div class="big">125<span class="u">M</span></div>
+        <h4>Synaptic connections</h4>
+        <p>Every one classified by transmitter. Acetylcholine excites its targets; GABA and glutamate inhibit them — exactly as coded here.</p>
+      </div>
+      <div class="card">
+        <div class="big">892</div>
+        <h4>Retinotopic columns</h4>
+        <p>The compound eye's ommatidia. Each samples one patch of the visual field and reports contrast and motion into the optic lobes.</p>
+      </div>
+      <div class="card">
+        <div class="big">4</div>
+        <h4>Descending neurons</h4>
+        <p>The narrow bottleneck from brain to body. Four of them — left, right, forward, click — are all it takes to drive a cursor.</p>
+      </div>
+    </div>
+
+    <div class="pipe" aria-label="Signal pipeline from eye to action">
+      <div class="step"><div class="n">01 · RETINA</div><h5>Light becomes current</h5><p>892 ommatidia sample what you fed. Photoreceptors respond to change and edges, not flat brightness — same as a real fly.</p><span class="arrow">▶</span></div>
+      <div class="step"><div class="n">02 · OPTIC LOBE</div><h5>Neurons integrate</h5><p>Current flows into a spiking population. ACh cells push their targets up; inhibitory cells hold them down. Recurrence makes it lively.</p><span class="arrow">▶</span></div>
+      <div class="step"><div class="n">03 · DESCENDING</div><h5>A decision crosses threshold</h5><p>Four descending neurons pool the activity. Whichever charges past threshold first fires — and turns, advances, or clicks.</p><span class="arrow">▶</span></div>
+      <div class="step"><div class="n">04 · BEHAVIOR</div><h5>The fly moves</h5><p>The gaze shifts, new light hits the eye, and the loop closes. That feedback loop is the whole optomotor reflex, in miniature.</p></div>
+    </div>
+  </section>
+
+  <!-- ============ THE STORY ============ -->
+  <section class="story wrap" id="story">
+    <div class="story-grid">
+      <div>
+        <div class="label kicker" style="color:var(--exc)">the fly on the internet</div>
+        <h2 class="sec">The first animal brain to live free online.</h2>
+        <p>The pitch, in the project's own words: this is <b>truth_terminal's successor</b> — except where that was a language model roleplaying a mind, this is the wiring of a <b>real animal</b>, simulated and turned loose on the open web.</p>
+        <p>It browses. It "sees" live pages through those 892 hex columns, and its four descending neurons walk a cursor around. Funded by its own creator fees, it <b>trades the top tokenized stocks</b> by 24-hour on-chain volume — launched not against ETH, but against tokenized GOOGL on Robinhood Chain.</p>
+        <p>Whether that's profound or absurd is the point. It's an <b>art experiment</b> wearing the clothes of a trading agent, and it's honest about the seams.</p>
+      </div>
+      <div>
+        <div class="pull">A fly can't read a chart. But its brain, wired exactly as nature left it, can still <span class="g">chase a moving light across a screen</span> — and that's most of what any of us do online.</div>
+        <div class="honest">
+          <div class="label">the fine print, as the project states it</div>
+          <p>The fly <b>has no goals and cannot read.</b> A script fills the gaps — it picks the paired asset, fills the forms, and sets the tax. FLYBRAIN is branded an <b>art experiment, not an investment.</b> This page is a tribute and a toy that makes the mechanic tangible; it is not affiliated with the token and is not financial advice.</p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <footer>
+    <div class="wrap">
+      <div class="foot">
+        <div>
+          <div class="fbrand">FLY<b>BRAIN</b></div>
+          <p>A playable tribute to a connectome memecoin. Real neuroscience, real dynamics, honest about what a fly can and can't do.</p>
+        </div>
+        <div class="links">
+          <a href="https://flybrain.online/" target="_blank" rel="noopener noreferrer">flybrain.online ↗</a>
+          <a href="https://x.com/fruitflydev" target="_blank" rel="noopener noreferrer">@fruitflydev ↗</a>
+          <a href="#rig">back to the rig ↑</a>
+        </div>
+      </div>
+      <p class="disc">Built as an interactive homage. The Drosophila connectome (Google Research / HHMI Janelia, 2026) is real science; the simulation here is a lightweight leaky integrate-and-fire model for illustration, not a scientific instrument. $FLYBRAIN is a speculative memecoin its own creators call an art experiment — nothing on this page is investment advice or an endorsement to buy, sell, or hold any asset.</p>
+    </div>
+  </footer>
+</main>
+
+<script>
+(function(){
+  "use strict";
+  var reduce = window.matchMedia && window.matchMedia("(prefers-reduced-motion:reduce)").matches;
+
+  /* ---------------- colors ---------------- */
+  var C = {
+    bg:[9,16,17], rest:[14,26,28],
+    spike:[87,255,191], exc:[255,157,77], inh:[89,176,255], click:[255,84,112]
+  };
+  function css(a,al){ return "rgba("+a[0]+","+a[1]+","+a[2]+","+(al==null?1:al)+")"; }
+  function mix(a,b,t){ return [a[0]+(b[0]-a[0])*t, a[1]+(b[1]-a[1])*t, a[2]+(b[2]-a[2])*t]; }
+
+  /* ---------------- the compound eye ---------------- */
+  function genEye(target){
+    var pts=[], N=20, q,r,s,x,y,d;
+    for(q=-N;q<=N;q++) for(r=-N;r<=N;r++){
+      s=-q-r; if(Math.abs(s)>N) continue;
+      x=Math.sqrt(3)*(q+r/2); y=1.5*r;
+      d=Math.sqrt(x*x+y*y);
+      pts.push({x:x,y:y,d:d});
+    }
+    pts.sort(function(a,b){return a.d-b.d;});
+    var eye=pts.slice(0,target), m=0, i;
+    for(i=0;i<eye.length;i++){ m=Math.max(m,Math.abs(eye[i].x),Math.abs(eye[i].y)); }
+    for(i=0;i<eye.length;i++){ eye[i].nx=eye[i].x/m; eye[i].ny=eye[i].y/m; }
+    eye.maxAbs=m;
+    return eye;
+  }
+  var EYE = genEye(892);
+  var NE = EYE.length;
+
+  /* optic canvas geometry + prebuilt hex paths */
+  var optic = document.getElementById("optic");
+  var octx = optic.getContext("2d");
+  var OW = optic.width, OH = optic.height;
+  var ocx = OW/2, ocy = OH/2;
+  var fit = (Math.min(OW,OH)/2 - 10) / EYE.maxAbs;   // scale unit coords to px
+  var hexPaths = new Array(NE);
+  var hexR = fit * 0.94;                               // center→corner in px
+  (function buildHexes(){
+    for(var i=0;i<NE;i++){
+      var px = ocx + EYE[i].x*fit, py = ocy + EYE[i].y*fit;
+      var p = new Path2D();
+      for(var k=0;k<6;k++){
+        var ang = Math.PI/180*(60*k-90);   // pointy-top
+        var vx = px + hexR*Math.cos(ang), vy = py + hexR*Math.sin(ang);
+        if(k===0) p.moveTo(vx,vy); else p.lineTo(vx,vy);
+      }
+      p.closePath();
+      hexPaths[i]=p;
+    }
+  })();
+
+  /* ---------------- scene (what we feed) ---------------- */
+  var SW=200, SH=200;
+  var scene = document.createElement("canvas"); scene.width=SW; scene.height=SH;
+  var sctx = scene.getContext("2d");
+  var sceneType="text", sceneText="FLYBRAIN";
+  var sdata=null;
+
+  function drawScene(t){
+    sctx.fillStyle="#000"; sctx.fillRect(0,0,SW,SH);
+    var i,x,y;
+    if(sceneType==="text"){
+      sctx.save();
+      sctx.translate(SW/2, SH/2);
+      var drift = Math.sin(t*0.0011)*6;
+      sctx.translate(drift, Math.cos(t*0.0009)*5);
+      sctx.textAlign="center"; sctx.textBaseline="middle";
+      // fit font to text
+      var txt = sceneText || " ";
+      var fs = Math.max(26, Math.min(112, 300/Math.max(3,txt.length)*1.6));
+      sctx.font = "800 "+fs+"px Syne, sans-serif";
+      sctx.fillStyle="#eafff4";
+      sctx.fillText(txt, 0, 0);
+      // faint echoes so the fly has edges to find around it
+      sctx.globalAlpha=0.28; sctx.font="800 "+(fs*0.5)+"px Syne, sans-serif";
+      sctx.fillText(txt, 0, -SH*0.4); sctx.fillText(txt, 0, SH*0.4);
+      sctx.restore();
+    } else if(sceneType==="face"){
+      sctx.strokeStyle="#eafff4"; sctx.fillStyle="#eafff4"; sctx.lineWidth=6;
+      var bob=Math.sin(t*0.002)*4;
+      sctx.beginPath(); sctx.arc(SW/2,SH/2+bob,72,0,7); sctx.stroke();
+      sctx.beginPath(); sctx.arc(72,88+bob,12,0,7); sctx.fill();
+      sctx.beginPath(); sctx.arc(128,88+bob,12,0,7); sctx.fill();
+      sctx.beginPath(); sctx.arc(SW/2,118+bob,42,0.15*Math.PI,0.85*Math.PI); sctx.stroke();
+    } else if(sceneType==="dot"){
+      x=SW/2 + Math.cos(t*0.0016)*66; y=SH/2 + Math.sin(t*0.0021)*58;
+      var g=sctx.createRadialGradient(x,y,2,x,y,26);
+      g.addColorStop(0,"#eafff4"); g.addColorStop(1,"rgba(0,0,0,0)");
+      sctx.fillStyle=g; sctx.beginPath(); sctx.arc(x,y,26,0,7); sctx.fill();
+    } else if(sceneType==="noise"){
+      var img=sctx.createImageData(SW,SH), dd=img.data;
+      for(i=0;i<dd.length;i+=4){ var v=Math.random()*255|0; dd[i]=dd[i+1]=dd[i+2]=v; dd[i+3]=255; }
+      sctx.putImageData(img,0,0);
+    } else if(sceneType==="grating"){
+      var ph=t*0.05;
+      for(x=0;x<SW;x++){
+        var b=(Math.sin((x*0.14)+ph)*0.5+0.5)*255|0;
+        sctx.fillStyle="rgb("+b+","+b+","+b+")";
+        sctx.fillRect(x,0,1,SH);
+      }
+    }
+    sdata = sctx.getImageData(0,0,SW,SH).data;
+  }
+
+  /* ---------------- retina sampling ---------------- */
+  var prevLum = new Float32Array(NE);
+  var drive   = new Float32Array(NE);   // photoreceptor output 0..~1
+  var FOV = 78;
+
+  function sampleRetina(gx,gy,cosT,sinT){
+    var i, sx, sy, ix, iy, idx, lum, dl, meanLum=0;
+    // first pass: luminance
+    for(i=0;i<NE;i++){
+      var nx=EYE[i].nx, ny=EYE[i].ny;
+      var rx = nx*cosT - ny*sinT, ry = nx*sinT + ny*cosT;
+      sx = gx + rx*FOV; sy = gy + ry*FOV;
+      // wrap into scene
+      sx = ((sx%SW)+SW)%SW; sy=((sy%SH)+SH)%SH;
+      ix = sx|0; iy = sy|0;
+      idx = (iy*SW+ix)*4;
+      lum = sdata? sdata[idx]/255 : 0;
+      EYE[i]._lum = lum; meanLum += lum;
+    }
+    meanLum /= NE;
+    var active=0;
+    for(i=0;i<NE;i++){
+      lum = EYE[i]._lum;
+      var temporal = Math.abs(lum - prevLum[i]) * 3.2;      // motion
+      var spatial  = Math.abs(lum - meanLum) * 0.9;          // contrast/edge
+      var d = temporal + spatial;
+      if(d>1) d=1;
+      drive[i] = drive[i]*0.55 + d*0.45;                     // smooth
+      prevLum[i]=lum;
+      if(drive[i]>0.12) active++;
+    }
+    return active;
+  }
+
+  /* ---------------- spiking population ---------------- */
+  var P=220;
+  var V   = new Float32Array(P);
+  var Vth = new Float32Array(P);
+  var refr= new Int16Array(P);
+  var nt  = new Int8Array(P);        // 0 ACh(+), 1 GABA(-), 2 Glu(-)
+  var spiked = new Uint8Array(P);
+  var Isyn = new Float32Array(P);
+  var SECT = 16;
+  var sectW = [];                     // per-neuron sparse sector weights
+  var syn = [];                       // per-neuron outgoing synapses
+  (function initPop(){
+    var i,j;
+    for(i=0;i<P;i++){
+      V[i]=Math.random()*0.5;
+      Vth[i]=0.9+Math.random()*0.25;
+      var rnd=Math.random();
+      nt[i]= rnd<0.82?0:(rnd<0.91?1:2);
+      // sector inputs: 1-3 sectors
+      var w={}; var nc=1+(Math.random()*3|0);
+      for(j=0;j<nc;j++){ w[(Math.random()*SECT)|0]=0.5+Math.random()*1.1; }
+      sectW.push(w);
+    }
+    // sparse recurrent synapses
+    for(i=0;i<P;i++){
+      var out=[]; var oc=5+(Math.random()*6|0);
+      var sign = nt[i]===0? 1 : -1;
+      for(j=0;j<oc;j++){
+        out.push({t:(Math.random()*P)|0, w:sign*(0.05+Math.random()*0.14)});
+      }
+      syn.push(out);
+    }
+  })();
+
+  var sectorDrive = new Float32Array(SECT);
+  function computeSectors(){
+    var cnt=new Int32Array(SECT); sectorDrive.fill(0);
+    for(var i=0;i<NE;i++){
+      var ang = Math.atan2(EYE[i].ny, EYE[i].nx); // -pi..pi
+      var s = (((ang+Math.PI)/(2*Math.PI))*SECT|0)%SECT;
+      sectorDrive[s]+=drive[i]; cnt[s]++;
+    }
+    for(var k=0;k<SECT;k++){ if(cnt[k]) sectorDrive[k]/=cnt[k]; }
+  }
+
+  var recentSpikes=0, spikeWindow=[], excCount=0, inhCount=0;
+  function stepPop(){
+    var i, s, k;
+    computeSectors();
+    // synaptic input from last step's spikers
+    Isyn.fill(0);
+    for(i=0;i<P;i++){
+      if(spiked[i]){
+        var out=syn[i];
+        for(k=0;k<out.length;k++){ Isyn[out[k].t]+=out[k].w; }
+      }
+    }
+    var frameSpk=0, e=0, inh=0;
+    for(i=0;i<P;i++){
+      spiked[i]=0;
+      if(refr[i]>0){ refr[i]--; V[i]*=0.6; continue; }
+      // external drive from sectors
+      var ext=0, w=sectW[i];
+      for(var key in w){ ext += sectorDrive[key]*w[key]; }
+      var I = ext*0.9 + Isyn[i] + (Math.random()-0.5)*0.06;
+      V[i] += (-(V[i])*0.16) + I*0.5;     // leak + input (Vrest=0)
+      if(V[i]<0) V[i]=0;
+      if(V[i]>=Vth[i]){
+        spiked[i]=1; V[i]=0; refr[i]=3+(Math.random()*4|0);
+        frameSpk++;
+        if(nt[i]===0) e++; else inh++;
+      }
+    }
+    recentSpikes += frameSpk;
+    excCount += e; inhCount += inh;
+    return frameSpk;
+  }
+
+  /* ---------------- descending neurons + cursor ---------------- */
+  var dnV=[0,0,0,0], dnTh=[1.0,0.85,1.0,1.35], dnCount=[0,0,0,0], dnCd=[0,0,0,0], dnFired=[0,0,0,0];
+  // 0 left, 1 fwd, 2 right, 3 click
+  var gx=SW/2, gy=SH/2, heading=0, clicks=0;
+  var trail=[]; var clickRings=[];
+
+  function stepDN(){
+    var i, leftD=0, rightD=0, fovD=0, total=0, lc=0, rc=0, fc=0;
+    for(i=0;i<NE;i++){
+      var d=drive[i], nx=EYE[i].nx, ny=EYE[i].ny;
+      total+=d;
+      if(nx<-0.05){ leftD+=d; lc++; } else if(nx>0.05){ rightD+=d; rc++; }
+      if(nx*nx+ny*ny < 0.16){ fovD+=d; fc++; }
+    }
+    total/=NE;
+    leftD = lc?leftD/lc:0; rightD = rc?rightD/rc:0; fovD = fc?fovD/fc:0;
+    // population contribution keeps it alive
+    var popAct = recentSpikesInst/P;
+
+    var inp=[
+      Math.max(0,leftD-rightD)*3.4 + popAct*0.15,          // LEFT
+      total*2.4 + 0.10 + popAct*0.25,                       // FWD (restless baseline)
+      Math.max(0,rightD-leftD)*3.4 + popAct*0.15,           // RIGHT
+      fovD*3.0                                              // CLICK (needs a centred stimulus)
+    ];
+    for(i=0;i<4;i++){
+      if(dnCd[i]>0){ dnCd[i]--; dnFired[i]=Math.max(0,dnFired[i]-1); }
+      dnV[i] += (-(dnV[i])*0.10) + inp[i]*0.5;
+      if(dnV[i]<0) dnV[i]=0;
+      if(dnV[i]>=dnTh[i] && dnCd[i]===0){
+        dnV[i]=0; dnCount[i]++; dnCd[i]=6; dnFired[i]=8;
+        if(i===0) heading-=0.34;
+        else if(i===2) heading+=0.34;
+        else if(i===1){ gx+=Math.cos(heading)*7.5; gy+=Math.sin(heading)*7.5; }
+        else if(i===3){ clicks++; clickRings.push({x:gx,y:gy,r:0}); }
+      }
+    }
+    // keep gaze on scene: reflect at edges
+    if(gx<8){gx=8;heading=Math.PI-heading;} if(gx>SW-8){gx=SW-8;heading=Math.PI-heading;}
+    if(gy<8){gy=8;heading=-heading;} if(gy>SH-8){gy=SH-8;heading=-heading;}
+    trail.push([gx,gy]); if(trail.length>60) trail.shift();
+  }
+
+  /* ---------------- rendering ---------------- */
+  function drawOptic(){
+    octx.fillStyle="#05090a"; octx.fillRect(0,0,OW,OH);
+    for(var i=0;i<NE;i++){
+      var d=drive[i], col;
+      if(d<0.02){ col=C.rest; }
+      else if(d>0.6){ col=mix(C.spike, C.exc, (d-0.6)/0.4); }
+      else { col=mix(C.rest, C.spike, d/0.6); }
+      octx.fillStyle="rgb("+(col[0]|0)+","+(col[1]|0)+","+(col[2]|0)+")";
+      octx.fill(hexPaths[i]);
+    }
+    // fovea crosshair (view is gaze-centred)
+    octx.strokeStyle=css(C.spike,0.5); octx.lineWidth=1;
+    octx.beginPath();
+    octx.moveTo(ocx-14,ocy); octx.lineTo(ocx-4,ocy);
+    octx.moveTo(ocx+4,ocy); octx.lineTo(ocx+14,ocy);
+    octx.moveTo(ocx,ocy-14); octx.lineTo(ocx,ocy-4);
+    octx.moveTo(ocx,ocy+4); octx.lineTo(ocx,ocy+14);
+    octx.stroke();
+    // watermark so screenshots are self-branded
+    octx.font="600 13px 'IBM Plex Mono', monospace";
+    octx.fillStyle="rgba(214,228,224,0.32)";
+    octx.textAlign="right"; octx.textBaseline="bottom";
+    octx.fillText("$FLYBRAIN · flybrain.online", OW-12, OH-9);
+    octx.textAlign="left";
+    octx.fillStyle="rgba(87,255,191,0.5)";
+    octx.fillText("SEEING: "+(sceneType==="text"?sceneText:sceneLabel()).toUpperCase(), 12, OH-9);
+  }
+
+  var raster=document.getElementById("raster"), rctx=raster.getContext("2d");
+  var RW=raster.width, RH=raster.height, RN=Math.min(160,P), rowH=RH/RN;
+  (function initRaster(){ rctx.fillStyle="#050809"; rctx.fillRect(0,0,RW,RH); })();
+  function drawRaster(){
+    // scroll left 2px
+    var img=rctx.getImageData(2,0,RW-2,RH);
+    rctx.putImageData(img,0,0);
+    rctx.fillStyle="#050809"; rctx.fillRect(RW-2,0,2,RH);
+    for(var i=0;i<RN;i++){
+      if(spiked[i]){
+        rctx.fillStyle = nt[i]===0 ? css(C.exc,0.95) : css(C.inh,0.95);
+        rctx.fillRect(RW-2, i*rowH, 2, Math.max(1,rowH));
+      }
+    }
+  }
+
+  var world=document.getElementById("world"), wctx=world.getContext("2d"), WW=world.width, WH=world.height;
+  function drawWorld(){
+    wctx.drawImage(scene,0,0,WW,WH);
+    wctx.fillStyle="rgba(5,8,9,0.45)"; wctx.fillRect(0,0,WW,WH);
+    // trail
+    wctx.strokeStyle=css(C.spike,0.55); wctx.lineWidth=1.2; wctx.beginPath();
+    for(var i=0;i<trail.length;i++){
+      var x=trail[i][0]/SW*WW, y=trail[i][1]/SH*WH;
+      if(i===0) wctx.moveTo(x,y); else wctx.lineTo(x,y);
+    }
+    wctx.stroke();
+    // rings
+    for(i=clickRings.length-1;i>=0;i--){
+      var cr=clickRings[i]; cr.r+=1.4;
+      wctx.strokeStyle=css(C.click, Math.max(0,0.8-cr.r/22));
+      wctx.beginPath(); wctx.arc(cr.x/SW*WW, cr.y/SH*WH, cr.r,0,7); wctx.stroke();
+      if(cr.r>22) clickRings.splice(i,1);
+    }
+    // cursor
+    var cx=gx/SW*WW, cy=gy/SH*WH;
+    wctx.strokeStyle=css(C.spike,0.95); wctx.lineWidth=1.4;
+    wctx.beginPath(); wctx.arc(cx,cy,4,0,7); wctx.stroke();
+    wctx.beginPath();
+    wctx.moveTo(cx,cy); wctx.lineTo(cx+Math.cos(heading)*9, cy+Math.sin(heading)*9); wctx.stroke();
+  }
+
+  function sceneLabel(){
+    if(sceneType==="text") return sceneText;
+    return {face:"a face",dot:"moving dot",noise:"static noise",grating:"drifting grating"}[sceneType]||sceneType;
+  }
+
+  /* ---------------- DOM updates ---------------- */
+  var elFps=document.getElementById("fps"), elRate=document.getElementById("r-rate"),
+      elActive=document.getElementById("r-active"), elGaze=document.getElementById("r-gaze"),
+      elClicks=document.getElementById("r-clicks"), elSeeing=document.getElementById("seeing"),
+      elEIe=document.getElementById("ei-e"), elEIi=document.getElementById("ei-i"),
+      elEIel=document.getElementById("ei-el"), elEIil=document.getElementById("ei-il");
+  var dnEls=[document.getElementById("dn-left"),document.getElementById("dn-fwd"),document.getElementById("dn-right"),document.getElementById("dn-click")];
+  var dnFill=dnEls.map(function(e){return e.querySelector(".fill");});
+  var dnCt=dnEls.map(function(e){return e.querySelector(".ct");});
+
+  function updateDN(){
+    for(var i=0;i<4;i++){
+      var pct=Math.min(100, dnV[i]/dnTh[i]*100);
+      dnFill[i].style.height=pct+"%";
+      if(dnFired[i]>0) dnEls[i].classList.add("fired"); else dnEls[i].classList.remove("fired");
+      dnCt[i].textContent=dnCount[i];
+    }
+  }
+
+  var lastMeta=0, frames=0, fpsT=performance.now(), recentSpikesInst=0;
+  function updateMeta(now){
+    var rate=Math.round(recentSpikes/((now-lastMeta)/1000));
+    recentSpikes=0; lastMeta=now;
+    elRate.textContent=isFinite(rate)?rate:0;
+    var act=0; for(var i=0;i<P;i++) if(V[i]>0.3) act++;
+    elActive.innerHTML=act+' <small>/ 220</small>';
+    elGaze.textContent=(gx|0).toString().padStart(3,"0")+","+(gy|0).toString().padStart(3,"0");
+    elClicks.textContent=clicks;
+    elSeeing.textContent=sceneLabel();
+    var tot=excCount+inhCount||1;
+    var ep=Math.round(excCount/tot*100), ip=100-ep;
+    elEIe.style.width=ep+"%"; elEIi.style.width=ip+"%";
+    elEIel.textContent="ACh "+ep+"%"; elEIil.textContent="GABA/Glu "+ip+"%";
+    excCount=0; inhCount=0;
+  }
+
+  /* ---------------- main loop ---------------- */
+  var running=true, lastT=performance.now();
+  function frame(now){
+    if(!running){ return; }
+    var cosT=Math.cos(heading), sinT=Math.sin(heading);
+    drawScene(now);
+    sampleRetina(gx,gy,cosT,sinT);
+    recentSpikesInst = stepPop();
+    stepDN();
+    drawOptic(); drawRaster(); drawWorld(); updateDN();
+
+    frames++;
+    if(now-fpsT>=500){ elFps.textContent=Math.round(frames*1000/(now-fpsT))+" fps"; frames=0; fpsT=now; }
+    if(now-lastMeta>=700){ updateMeta(now); }
+    lastT=now;
+    rafId=requestAnimationFrame(frame);
+  }
+  var rafId=null;
+  lastMeta=performance.now();
+
+  // draw one still frame immediately (good thumbnail even before rAF)
+  (function firstPaint(){
+    drawScene(performance.now());
+    sampleRetina(gx,gy,Math.cos(heading),Math.sin(heading));
+    stepPop(); drawOptic(); drawWorld();
+  })();
+  rafId=requestAnimationFrame(frame);
+
+  /* ---------------- controls ---------------- */
+  function setScene(type, text){
+    sceneType=type;
+    if(type==="text"){ sceneText=(text||"").toUpperCase().slice(0,42) || "?"; }
+    // little kick so the change is felt
+    for(var i=0;i<4;i++) dnV[i]=0;
+  }
+  document.getElementById("feedForm").addEventListener("submit",function(e){
+    e.preventDefault();
+    var v=document.getElementById("feedInput").value.trim();
+    if(v){ setScene("text", v); }
+    document.querySelectorAll(".chip").forEach(function(c){c.setAttribute("aria-pressed","false");});
+  });
+  document.querySelectorAll(".chip").forEach(function(chip){
+    chip.addEventListener("click",function(){
+      document.querySelectorAll(".chip").forEach(function(c){c.setAttribute("aria-pressed","false");});
+      chip.setAttribute("aria-pressed","true");
+      setScene(chip.dataset.scene, chip.dataset.text);
+      if(chip.dataset.scene==="text"){ document.getElementById("feedInput").value=chip.dataset.text; }
+    });
+  });
+
+  var pauseBtn=document.getElementById("pauseBtn");
+  pauseBtn.addEventListener("click",function(){
+    running=!running;
+    pauseBtn.textContent = running? "❚❚ pause" : "▶ resume";
+    if(running){ lastT=performance.now(); fpsT=performance.now(); lastMeta=performance.now(); rafId=requestAnimationFrame(frame); }
+  });
+
+  var toast=document.getElementById("toast"), toastT=null;
+  document.getElementById("snapBtn").addEventListener("click",function(){
+    var cap="I fed \""+sceneLabel()+"\" to $FLYBRAIN — a fruit fly's connectome, "+clicks+" clicks and counting. Watch its brain react: flybrain.online";
+    var done=function(){ toast.classList.add("show"); clearTimeout(toastT); toastT=setTimeout(function(){toast.classList.remove("show");},2600); };
+    if(navigator.clipboard && navigator.clipboard.writeText){ navigator.clipboard.writeText(cap).then(done, done); }
+    else { done(); }
+  });
+
+  // set default chip state
+  document.getElementById("feedInput").value="FLYBRAIN";
+})();
+</script>

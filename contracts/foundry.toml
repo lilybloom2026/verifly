@@ -1,0 +1,21 @@
+# Foundry config for the CIPHERFLY contracts.
+# Usage (from the contracts/ dir):
+#   forge build
+#   forge test -vvv
+#
+# These contracts are dependency-free (no OpenZeppelin import), so `forge build`
+# works with a bare Foundry install — no `forge install` needed.
+
+[profile.default]
+src = "."
+test = "test"
+out = "out"
+libs = ["lib"]
+solc_version = "0.8.24"
+optimizer = true
+optimizer_runs = 200
+
+# Deploy example (set your own RPC + key; Robinhood Chain / Base / Arbitrum are
+# all EVM, so the same bytecode deploys to any of them):
+#   forge create FlyGenome.sol:FlyGenome --constructor-args <treasury> \
+#     --rpc-url $RPC_URL --private-key $PK
