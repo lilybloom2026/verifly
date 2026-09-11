@@ -8,6 +8,10 @@
 const GITHUB_URL = "https://github.com/lilybloom2026/verifly";
 const X_URL = "https://x.com/verifly_labs";
 
+// Buy link is read from the env at build time. Set NEXT_PUBLIC_BUY_URL to show
+// the Buy button; leave it unset and the button does not render.
+const BUY_URL = process.env.NEXT_PUBLIC_BUY_URL;
+
 const shadow = { textShadow: "0 2px 24px rgba(0,0,0,0.95), 0 1px 4px rgba(0,0,0,0.95)" };
 
 function GithubIcon({ className = "" }: { className?: string }) {
@@ -38,10 +42,10 @@ export default function HeroOverlay() {
 
       {/* top group: bar + headline */}
       <div className="relative">
-        <div className="flex items-start justify-between gap-3 p-4 sm:p-6">
-          <div className="pointer-events-auto flex items-center gap-2.5">
+        <div className="flex items-center justify-between gap-3 p-4 sm:p-6">
+          <div className="pointer-events-auto flex min-w-0 items-center gap-2.5">
             <span
-              className="font-display text-[24px] font-extrabold leading-none tracking-tight text-ink sm:text-[30px]"
+              className="font-display text-[21px] font-extrabold leading-none tracking-tight text-ink min-[380px]:text-[24px] sm:text-[30px]"
               style={shadow}
             >
               VERI<span className="text-spike">FLY</span>
@@ -50,13 +54,23 @@ export default function HeroOverlay() {
               PROOF OF BRAIN
             </span>
           </div>
-          <div className="pointer-events-auto flex items-center gap-2.5">
+          <div className="pointer-events-auto flex items-center gap-2 sm:gap-2.5">
+            {BUY_URL && (
+              <a
+                href={BUY_URL}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="shrink-0 whitespace-nowrap rounded-full bg-[#22e07a] px-3.5 py-2 font-mono text-[11px] font-bold uppercase tracking-wider text-[#05130b] shadow-[0_0_22px_rgba(34,224,122,0.5)] ring-1 ring-[#22e07a]/40 transition hover:bg-[#3ff08e] active:scale-95 min-[380px]:px-4 min-[380px]:py-2.5 min-[380px]:text-[12px] min-[380px]:tracking-widest sm:px-6 sm:py-3 sm:text-[14px]"
+              >
+                Buy $VERIFLY <span aria-hidden>▸</span>
+              </a>
+            )}
             <a
               href={GITHUB_URL}
               target="_blank"
               rel="noopener noreferrer"
               aria-label="VERIFLY on GitHub"
-              className="flex h-11 w-11 items-center justify-center rounded-lg border border-line2 bg-black/50 text-ink backdrop-blur-sm transition hover:border-spike hover:text-spike active:scale-95"
+              className="hidden h-11 w-11 items-center justify-center rounded-lg border border-line2 bg-black/50 text-ink backdrop-blur-sm transition hover:border-spike hover:text-spike active:scale-95 sm:flex"
             >
               <GithubIcon className="h-6 w-6" />
             </a>
@@ -65,7 +79,7 @@ export default function HeroOverlay() {
               target="_blank"
               rel="noopener noreferrer"
               aria-label="VERIFLY on X"
-              className="flex h-11 w-11 items-center justify-center rounded-lg border border-line2 bg-black/50 text-ink backdrop-blur-sm transition hover:border-spike hover:text-spike active:scale-95"
+              className="hidden h-11 w-11 items-center justify-center rounded-lg border border-line2 bg-black/50 text-ink backdrop-blur-sm transition hover:border-spike hover:text-spike active:scale-95 sm:flex"
             >
               <XIcon className="h-5 w-5" />
             </a>
