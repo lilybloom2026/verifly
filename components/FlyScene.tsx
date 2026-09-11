@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo } from "react";
+import { useMemo, useState } from "react";
 import { Canvas } from "@react-three/fiber";
 import { OrbitControls } from "@react-three/drei";
 import {
@@ -13,23 +13,25 @@ import { ToneMappingMode } from "postprocessing";
 import * as THREE from "three";
 import { FlyBrain } from "@/lib/flybrain";
 import Brain3D from "./Brain3D";
-import HeroOverlay from "./HeroOverlay";
 
 export default function FlyScene() {
   const brain = useMemo(() => new FlyBrain(), []);
+  const [ready, setReady] = useState(false);
 
   return (
-    <div className="absolute inset-0">
+    <div
+      className={`absolute inset-0 transition-opacity duration-700 ${ready ? "opacity-100" : "opacity-0"}`}
+    >
       <Canvas
         dpr={[1, 2]}
         gl={{
           antialias: true,
-          preserveDrawingBuffer: true,
           powerPreference: "high-performance",
         }}
         camera={{ position: [0, 1.5, 17], fov: 48, near: 0.1, far: 120 }}
         onCreated={({ gl }) => {
           gl.setClearColor(new THREE.Color("#050505"), 1);
+          setReady(true);
         }}
       >
         <fog attach="fog" args={["#050505", 16, 40]} />
@@ -67,8 +69,6 @@ export default function FlyScene() {
             "radial-gradient(120% 80% at 50% 45%, transparent 45%, rgba(0,0,0,0.6) 100%)",
         }}
       />
-
-      <HeroOverlay />
     </div>
   );
 }
